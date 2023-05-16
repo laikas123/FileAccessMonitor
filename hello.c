@@ -37,7 +37,7 @@ int handle_event_read(void *ctx, void *data, size_t data_sz)
 	struct read_data_t *kern_dat = data;
 
 	//only log for specific list of files to monitor
-	if(kern_dat-> inode != 1396301){
+	if(kern_dat-> inode != 1396301 && kern_dat -> inode != 1318781){
 		return 0;
 	}
 
@@ -50,8 +50,11 @@ int handle_event_read(void *ctx, void *data, size_t data_sz)
         exit(1);
     }
   
-    int chars_written = fprintf(outfile, "%d %d %d %lu %s\n", kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
+    // int chars_written = fprintf(outfile, "%d %d %d %lu %s\n", kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
+	int chars_written = fprintf(outfile, "{\"pid\":%d,\"uid\":%d,\"fd\":%d,\"inode\":%lu,\"command\":\"%s\"}\n", kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
   
+
+
 	if(chars_written < 0){
 		printf("Error writing to file, err = %d", chars_written);
 	}else{
