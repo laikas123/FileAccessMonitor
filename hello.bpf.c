@@ -196,36 +196,79 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
         
         int testpid;
 
-        struct files_struct *f_str;
+        
 
-        struct file *my_file;
-
-        struct inode *m_inode;
-
-        long unsigned int i_ino;
-
-        struct file *fd_array[1];
 
         bpf_probe_read(&testpid, sizeof(testpid), (void *)&task->pid); 
 
         bpf_printk("PID ++++ = %d and =%d", testpid, data.pid); 
 
-        int index = 0;
+
+
+
+        // struct files_struct *files;
+
+        struct file my_file;
+
+        struct inode *f_inode;
+
+        long unsigned int i_ino;
 
         // if(task->files->fd_array != NULL && index < sizeof(task -> files -> fd_array)){
-        bpf_probe_read(&f_str, sizeof(f_str), (void *)&task->files);
+        // bpf_probe_read(&files, sizeof(files), (void *)&task->files);
 
-        bpf_probe_read(&my_file, sizeof(my_file), (void *)&f_str->fd_array[3]);
+        // bpf_probe_read(&my_file, sizeof(my_file), (void *)&(*files->fd_array[2]) );
 
-        // bpf_probe_read(&my_file, sizeof(my_file), (void *)&fd_array[0]);
+        // // bpf_probe_read(&my_file, sizeof(my_file), (void *)&fd_array[0]);
 
-        bpf_probe_read(&m_inode, sizeof(m_inode), (void *)&my_file -> f_inode);
+        // bpf_probe_read(&f_inode, sizeof(f_inode), (void *)&my_file.f_inode);
 
-        bpf_probe_read(&i_ino, sizeof(i_ino), (void *)&m_inode -> i_ino);
+        // bpf_probe_read(&i_ino, sizeof(i_ino), (void *)&f_inode -> i_ino);
 
 
+        // u64 inode = task->mm->exe_file->f_inode->i_ino;
 
-        bpf_printk("inode +++++= %lu ", i_ino);
+        // struct mm_struct *mm;
+
+
+        // u64 inode = BPF_CORE_READ(task, mm, exe_file, f_inode, i_ino);
+
+        struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
+
+        struct file* files[5];
+
+        bpf_probe_read(&files[0], sizeof(files[0]), &fd[0]);
+        bpf_probe_read(&files[1], sizeof(files[1]), &fd[1]);
+        bpf_probe_read(&files[2], sizeof(files[2]), &fd[2]);
+        bpf_probe_read(&files[3], sizeof(files[3]), &fd[3]);
+        bpf_probe_read(&files[4], sizeof(files[4]), &fd[4]);
+
+        struct inode* inodes[4];
+
+        bpf_probe_read(&inodes[0], sizeof(inodes[0]), &files[0]->f_inode);
+        bpf_probe_read(&inodes[1], sizeof(inodes[1]), &files[1]->f_inode);
+        bpf_probe_read(&inodes[2], sizeof(inodes[2]), &files[2]->f_inode);
+        bpf_probe_read(&inodes[3], sizeof(inodes[3]), &files[3]->f_inode);
+        bpf_probe_read(&inodes[4], sizeof(inodes[4]), &files[4]->f_inode);
+
+        u64 inos[4];
+        bpf_probe_read(&inos[0], sizeof(inos[0]), &inodes[0]->i_ino);
+        bpf_probe_read(&inos[1], sizeof(inos[1]), &inodes[1]->i_ino);
+        bpf_probe_read(&inos[2], sizeof(inos[2]), &inodes[2]->i_ino);
+        bpf_probe_read(&inos[3], sizeof(inos[3]), &inodes[3]->i_ino);
+        bpf_probe_read(&inos[4], sizeof(inos[4]), &inodes[4]->i_ino);
+
+        bpf_printk("fd ++++++= %d", ctx->fd);
+        bpf_printk("inode +++++= %lu ", inos[0]);
+        bpf_printk("inode +++++= %lu ", inos[1]);
+        bpf_printk("inode +++++= %lu ", inos[2]);
+        bpf_printk("inode +++++= %lu ", inos[3]);
+        bpf_printk("inode +++++= %lu ", inos[4]);
+
+
+        
+
+        // bpf_printk("inode +++++= %lu ", inode);
 
         // }
         // if(0 < sizeof(task->files->fd_array)){
