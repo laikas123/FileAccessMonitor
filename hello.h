@@ -8,6 +8,29 @@ struct data_t {
    unsigned int fd;
 };
 
+
+struct openat_dat_t {
+   int pid;
+   int uid;
+   int dirfd;
+   char filename[50];
+};
+
+struct exit_openat_dat_t {
+   int pid;
+   int uid;
+   int fd;
+   char command[16];
+};
+
+
+struct exit_read_dat_t {
+   int pid;
+   int uid;
+   long bytes_read;
+   char command[16];
+};
+
 struct msg_t {
    char message[12];
 };
