@@ -10,6 +10,7 @@
 
 
 const char word[16] = "pseudocat";
+const char word2[16] = "symlinkat";
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
@@ -23,27 +24,58 @@ void handle_event(void *ctx, int cpu, void *data, unsigned int data_sz)
 {
 	struct data_t *m = data;
 
-        if(m-> pid == 51960){
-	    printf("OK\n");
+	if (strstr(m->message, word2) != NULL ) {
+	
+	if(m-> fd == 3){
+	printf("%lu  %lu  %s\n", m->pid, m->fd, m->command);
+	
+	char path_str[100];
+    sprintf(path_str, "/proc/%d/fd", m->pid);
+	// printf("path str is %s \n", path_str);
 
-		DIR *mydir;
+	DIR *mydir;
     struct dirent *myfile;
     struct stat mystat;
 
-    char buf[512];
-    mydir = opendir("/proc/51960/fd");
-    while((myfile = readdir(mydir)) != NULL)
-    {
+	// printf("msg is %s \n", m->message);
+	
 
-        sprintf(buf, "%s/%s", "/proc/51960/fd", myfile->d_name);
-        stat(buf, &mystat);
-        printf("%zu\n",mystat.st_size);
-        printf("%zu\n", mystat.st_ino);
-        printf(" %s\n", myfile->d_name);
-    }
-    closedir(mydir);
-       printf("%-6d %-6d %-16s %-16s %s\n", m->pid, m->uid, m->command, m->path, m->message);
+    char buf[512];
+    mydir = opendir(path_str);
+	if(mydir != NULL){
+		
+	
+		while((myfile = readdir(mydir)) != NULL)
+		{
+			// printf("HERE 1 \n");
+
+			sprintf(buf, "%s/%s", path_str, myfile->d_name);
+			stat(buf, &mystat);
+			// printf("%zu\n",mystat.st_size);
+			printf("%zu\n", mystat.st_ino);
+			// printf(" %s\n", myfile->d_name);
+
+			if(mystat.st_ino == 1396301){
+				printf("WAIT STOP!\n");
+				printf("inode = %d \n", mystat.st_ino);
+				printf("%lu  %lu  %s\n", m->pid, m->fd, m->command);
+			}else{
+				// printf("inode = %d \n", mystat.st_ino);
+			}
+
+
+		}
 	}
+    if(mydir != NULL){
+		// printf("HERE 2 \n");
+    	closedir(mydir);
+	}
+
+	}
+
+	}
+    //    printf("%-6d %-6d %-16s %-16s %s\n", m->pid, m->uid, m->command, m->path, m->message);
+	
 
 	// printf("%-6d %-6d %-16s %-16s %s\n", m->pid, m->uid, m->command, m->path, m->message);
 
@@ -53,7 +85,7 @@ void handle_event(void *ctx, int cpu, void *data, unsigned int data_sz)
 
 void lost_event(void *ctx, int cpu, long long unsigned int data_sz)
 {
-	printf("lost event\n");
+	// printf("lost event\n");
 }
 
 int main()

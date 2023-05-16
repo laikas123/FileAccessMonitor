@@ -10,6 +10,7 @@ const char fentry_msg[16] = "fentry_execve";
 const char tp_msg[16] = "tp_execve";
 const char tp_msg2[16] = "tp_openat";
 const char tp_msg3[16] = "pseudocat";
+const char tp_msg4[16] = "symlinkat";
 const char tp_btf_exec_msg[16] = "tp_btf_exec";
 const char raw_tp_exec_msg[16] = "raw_tp_exec";
 struct {
@@ -50,22 +51,22 @@ struct my_syscalls_enter_execve {
 	long envp_ptr;
 };
 
-SEC("tp/syscalls/sys_enter_execve")
-int tp_sys_enter_execve(struct my_syscalls_enter_execve *ctx) {
-   struct data_t data = {}; 
+// SEC("tp/syscalls/sys_enter_execve")
+// int tp_sys_enter_execve(struct my_syscalls_enter_execve *ctx) {
+//    struct data_t data = {}; 
 
-   bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg);
-   bpf_printk("%s: ctx->filename_ptr: %s", tp_msg, ctx->filename_ptr);
+//    bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg);
+//    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg, ctx->filename_ptr);
 
-   data.pid = bpf_get_current_pid_tgid() >> 32;
-   data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+//    data.pid = bpf_get_current_pid_tgid() >> 32;
+//    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
 
-   bpf_get_current_comm(&data.command, sizeof(data.command));
-   bpf_probe_read_user(&data.path, sizeof(data.path), ctx->filename_ptr);  
+//    bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->filename_ptr);  
 
-   bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
-   return 0;
-}
+//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    return 0;
+// }
 
 struct my_syscalls_enter_openat {
     unsigned short common_type;	
@@ -81,24 +82,24 @@ struct my_syscalls_enter_openat {
 };
 
 
-SEC("tp/syscalls/sys_enter_openat")
-int tp_sys_enter_openat(struct my_syscalls_enter_openat *ctx) {
-   struct data_t data = {}; 
+// SEC("tp/syscalls/sys_enter_openat")
+// int tp_sys_enter_openat(struct my_syscalls_enter_openat *ctx) {
+//    struct data_t data = {}; 
 
-   bpf_probe_read_kernel(&data.message, sizeof(data.message), ctx->filename_ptr);
-   bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->filename_ptr);
-   bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->dfd);
+//    bpf_probe_read_kernel(&data.message, sizeof(data.message), );
+//    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->filename_ptr);
+//    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->dfd);
 
 
-   data.pid = bpf_get_current_pid_tgid() >> 32;
-   data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+//    data.pid = bpf_get_current_pid_tgid() >> 32;
+//    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
 
-   bpf_get_current_comm(&data.command, sizeof(data.command));
-   bpf_probe_read_user(&data.path, sizeof(data.path), ctx->filename_ptr);  
+//    bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->filename_ptr);  
 
-   bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
-   return 0;
-}
+//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    return 0;
+// }
 
 
 struct my_syscalls_exit_openat {
@@ -134,6 +135,129 @@ int tp_sys_exit_openat(struct my_syscalls_exit_openat *ctx) {
    return 0;
 }
 
+// struct my_syscalls_enter_read {
+// 	unsigned short common_type;
+// 	unsigned char common_flags;
+// 	unsigned char common_preempt_count;
+// 	long common_pid;
+// 	unsigned long __syscall_nr;
+// 	unsigned long fd;	
+// 	unsigned long buf;
+// 	unsigned long count;
+// };
+
+struct my_syscalls_enter_read {
+	unsigned long long unused;
+	long syscall_nr;
+	long fd;
+	long buf;
+	long count;
+};
+
+
+SEC("tp/syscalls/sys_enter_read")
+int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
+   struct data_t data = {}; 
+
+   bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg4);
+
+
+   data.pid = bpf_get_current_pid_tgid() >> 32;
+   data.fd = ctx -> fd;
+
+   bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
+//    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
+
+   bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+   return 0;
+}
+
+
+
+
+// struct my_syscalls_enter_symlinkat {
+//     unsigned short common_type;
+// 	unsigned char common_flags;
+// 	unsigned char common_preempt_count;
+// 	int common_pid;
+
+// 	long __syscall_nr;
+// 	long oldname;
+// 	long newdfd;
+// 	long newname;
+// };
+
+// SEC("tp/syscalls/sys_enter_symlinkat")
+// int tp_sys_enter_symlinkat(struct my_syscalls_enter_symlinkat *ctx) {
+//    struct data_t data = {}; 
+
+//    bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg4);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->filename_ptr);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->dfd);
+
+
+//    data.pid = bpf_get_current_pid_tgid() >> 32;
+//    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+
+//    bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
+//    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
+
+//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    return 0;
+// }
+
+// struct my_syscalls_enter_symlink {
+//     unsigned short common_type;	
+// 	unsigned char common_flags;
+// 	unsigned char common_preempt_count;
+// 	long common_pid;
+//     long __syscall_nr;
+// 	long oldname;
+// 	long newname;
+
+// };
+
+
+// SEC("tp_btf/sys_enter_symlink")
+// int handle_exec(struct trace_event_raw_sys_enter_symlink *ctx){
+//    struct data_t data = {}; 
+
+//    bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg4);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->filename_ptr);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->dfd);
+
+
+//    data.pid = bpf_get_current_pid_tgid() >> 32;
+//    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+
+//    bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
+//    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
+
+//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    return 0;
+// }
+// SEC("tp/syscalls/sys_enter_symlink")
+// int tp_sys_enter_symlink(struct my_syscalls_enter_symlink *ctx) {
+//    struct data_t data = {}; 
+
+//    bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg4);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->filename_ptr);
+// //    bpf_printk("%s: ctx->filename_ptr: %s", tp_msg2, ctx->dfd);
+
+
+//    data.pid = bpf_get_current_pid_tgid() >> 32;
+//    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+
+//    bpf_get_current_comm(&data.command, sizeof(data.command));
+//    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
+//    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
+
+//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    return 0;
+// }
 
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
