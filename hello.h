@@ -31,6 +31,14 @@ struct exit_read_dat_t {
    char command[16];
 };
 
+struct close_dat_t {
+   int pid;
+   int uid;
+   int fd;
+   char filename[50];
+   char command[16];
+};
+
 struct msg_t {
    char message[12];
 };

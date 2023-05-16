@@ -14,9 +14,8 @@ const char tp_msg4[16] = "read";
 const char tp_btf_exec_msg[16] = "tp_btf_exec";
 const char raw_tp_exec_msg[16] = "raw_tp_exec";
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
 } output SEC(".maps");
 
 struct {
@@ -29,23 +28,27 @@ struct {
 
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
 } output_openat SEC(".maps");
 
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
 } output_exit_openat SEC(".maps");
 
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 256 * 1024 /* 256 KB */);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
 } output_exit_read SEC(".maps");
+
+
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
+} output_close SEC(".maps");
 
 // name: sys_enter_execve
 // ID: 622
@@ -84,7 +87,7 @@ struct my_syscalls_enter_execve {
 //    bpf_get_current_comm(&data.command, sizeof(data.command));
 //    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->filename_ptr);  
 
-//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    bpf_ringbuf_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
 //    return 0;
 // }
 
@@ -113,7 +116,7 @@ int tp_sys_enter_openat(struct my_syscalls_enter_openat *ctx) {
 
    bpf_probe_read_user(&data.filename, sizeof(data.filename), ctx->filename_ptr);  
    if(data.uid == 1000){
-        bpf_perf_event_output(ctx, &output_openat, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+        bpf_ringbuf_output(&output_openat, &data, sizeof(data), 0);   
    }
    return 0;
 }
@@ -143,7 +146,7 @@ int tp_sys_exit_openat(struct my_syscalls_exit_openat *ctx) {
    data.fd = ctx-> ret;
    bpf_get_current_comm(&data.command, sizeof(data.command));
    if(data.uid == 1000){
-    bpf_perf_event_output(ctx, &output_exit_openat, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+    bpf_ringbuf_output(&output_exit_openat, &data, sizeof(data), 0);   
    }
    return 0;
 }
@@ -174,6 +177,10 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
 
    bpf_probe_read_kernel(&data.message, sizeof(data.message), tp_msg4);
 
+//    struct task_struct *t = (struct task_struct *)bpf_get_current_task();
+
+//    struct task_struct *task = (void *)bpf_get_current_task();
+
 
    data.pid = bpf_get_current_pid_tgid() >> 32;
    data.fd = ctx -> fd;
@@ -183,11 +190,71 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
 //    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
    
    int uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+
+    if(uid == 1000){
+        struct task_struct *task = (void *)bpf_get_current_task();
+        
+        int testpid;
+
+        struct files_struct *f_str;
+
+        struct file *my_file;
+
+        struct inode *m_inode;
+
+        long unsigned int i_ino;
+
+        struct file *fd_array[1];
+
+        bpf_probe_read(&testpid, sizeof(testpid), (void *)&task->pid); 
+
+        bpf_printk("PID ++++ = %d and =%d", testpid, data.pid); 
+
+        int index = 0;
+
+        // if(task->files->fd_array != NULL && index < sizeof(task -> files -> fd_array)){
+        bpf_probe_read(&f_str, sizeof(f_str), (void *)&task->files);
+
+        bpf_probe_read(&my_file, sizeof(my_file), (void *)&f_str->fd_array[3]);
+
+        // bpf_probe_read(&my_file, sizeof(my_file), (void *)&fd_array[0]);
+
+        bpf_probe_read(&m_inode, sizeof(m_inode), (void *)&my_file -> f_inode);
+
+        bpf_probe_read(&i_ino, sizeof(i_ino), (void *)&m_inode -> i_ino);
+
+
+
+        bpf_printk("inode +++++= %lu ", i_ino);
+
+        // }
+        // if(0 < sizeof(task->files->fd_array)){
+        //     bpf_probe_read(&i_ino, sizeof(i_ino), (void *)&task->files->fd_array[0]->f_inode->i_ino);
+        // }
+        // bpf_probe_read(&i_ino, sizeof(i_ino), (void *)&task->files->fd_array[0]->f_inode->i_ino); 
+
+        // int count;
+
+        // for(int i = 0; i < 6; i++){
+        //     bpf_printk("index % d inode = %d of pid = %d", i, f_str -> fd_array[i]->f_inode, testpid); 
+        // }
+
+
+          
+        
+   }
+
+
    if(uid == 1000){
-        bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+        bpf_ringbuf_output(&output, &data, sizeof(data), 0);   
    }
    return 0;
 }
+
+// int hello_execve(void *ctx) {
+//     bpf_trace_printk("Executing a program");
+//     return 0;
+// }
 
 
 struct my_syscalls_exit_read {
@@ -212,6 +279,34 @@ int tp_sys_exit_read(struct my_syscalls_exit_read *ctx) {
    bpf_get_current_comm(&data.command, sizeof(data.command));
    if(data.uid == 1000){
     bpf_ringbuf_output(&output_exit_read, &data, sizeof(data), 0);   
+   }
+   return 0;
+}
+
+
+
+struct my_syscalls_enter_close {
+    unsigned short common_type;
+	unsigned char common_flags;
+	unsigned char common_preempt_count;
+	int common_pid;
+
+	long __syscall_nr;
+	long fd;
+
+};
+
+
+SEC("tp/syscalls/sys_enter_close")
+int tp_sys_enter_close(struct my_syscalls_enter_close *ctx) {
+   struct close_dat_t data = {}; 
+
+   data.pid = bpf_get_current_pid_tgid() >> 32;
+   data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+   data.fd = ctx-> fd;
+   bpf_get_current_comm(&data.command, sizeof(data.command));
+   if(data.uid == 1000){
+    bpf_ringbuf_output(&output_close, &data, sizeof(data), 0);   
    }
    return 0;
 }
@@ -246,7 +341,7 @@ int tp_sys_exit_read(struct my_syscalls_exit_read *ctx) {
 //    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
 //    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
 
-//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    bpf_ringbuf_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
 //    return 0;
 // }
 
@@ -278,7 +373,7 @@ int tp_sys_exit_read(struct my_syscalls_exit_read *ctx) {
 //    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
 //    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
 
-//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    bpf_ringbuf_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
 //    return 0;
 // }
 // SEC("tp/syscalls/sys_enter_symlink")
@@ -297,7 +392,7 @@ int tp_sys_exit_read(struct my_syscalls_exit_read *ctx) {
 //    bpf_probe_read_user(&data.path, sizeof(data.path), ctx->oldname);
 //    bpf_probe_read_user(&data.path2, sizeof(data.path2), ctx->newname);  
 
-//    bpf_perf_event_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
+//    bpf_ringbuf_output(ctx, &output, BPF_F_CURRENT_CPU, &data, sizeof(data));   
 //    return 0;
 // }
 

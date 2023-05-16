@@ -8,6 +8,16 @@
 #include "hello.skel.h"
 #include <dirent.h> 
 #include <fcntl.h>
+#include <time.h>
+
+int x = 0;
+
+void timestamp()
+{
+    time_t ltime; /* calendar time */
+    ltime=time(NULL); /* get current cal time */
+    printf("%s",asctime( localtime(&ltime) ) );
+}
 
 
 const char word[16] = "pseudocat";
@@ -22,7 +32,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-void handle_event(void *ctx, int cpu, void *data, unsigned int data_sz)
+void handle_event_read(void *ctx, void *data, unsigned int data_sz)
 {
 	struct data_t *m = data;
 
@@ -30,8 +40,13 @@ void handle_event(void *ctx, int cpu, void *data, unsigned int data_sz)
 		return;
 	}
 
+	printf("enter_read START%lu  %lu %s\n", m->pid, m->uid, m->command);
+	x += 1;
+	printf("X= %d\n", x);
+
 	if (strstr(m->message, word2) != NULL ) {
 	
+
 	
 
 	// if(m -> pid == 11091){
@@ -86,16 +101,34 @@ void handle_event(void *ctx, int cpu, void *data, unsigned int data_sz)
 	
 
 	// printf("%-6d %-6d %-16s %-16s %s\n", m->pid, m->uid, m->command, m->path, m->message);
-
+	printf("enter_read STOP%lu  %lu  %s \n", m->pid, m->uid, m->command);
+	x += 1;
+	printf("X= %d\n", x);
 
 	
 }
 
 
-void handle_event_openat(void *ctx, int cpu, void *data, unsigned int data_sz)
+void handle_event_openat(void *ctx, void *data, unsigned int data_sz)
 {
 	struct openat_dat_t *m = data;
 
+	// printf("%lu  %lu %d %s\n", m->pid, m->uid, m->dirfd, m->filename);
+
+	
+}
+
+void handle_event_close(void *ctx, void *data, unsigned int data_sz)
+{
+	struct close_dat_t *m = data;
+
+	if(strstr(m->command, word3) == NULL){
+		return;
+	}
+
+	printf("enter_close START%lu  %lu %s \n", m->pid, m->uid, m->command);
+	x += 1;
+	printf("X= %d\n", x);
 	// printf("%lu  %lu %d %s\n", m->pid, m->uid, m->dirfd, m->filename);
 
 	
@@ -109,8 +142,9 @@ void handle_event_exit_read(void *ctx, void *data, unsigned int data_sz)
 		return;
 	}
 
-	printf("exit_read START%lu  %lu %d \n", m->pid, m->uid,  m->bytes_read);
-
+	printf("exit_read START%lu  %lu  %s \n", m->pid, m->uid,  m->command);
+	x += 1;
+	printf("X= %d\n", x);
 	
 	
 	char path_str[100];
@@ -132,12 +166,12 @@ void handle_event_exit_read(void *ctx, void *data, unsigned int data_sz)
 			sprintf(buf, "%s/%s", path_str, myfile->d_name);
 			stat(buf, &mystat);
 			// printf("%zu\n",mystat.st_size);
-			printf("%zu\n", mystat.st_ino);
-			printf(" %s\n", myfile->d_name);
+			// printf("%zu\n", mystat.st_ino);
+			// printf(" %s\n", myfile->d_name);
 			
 
 			if(mystat.st_ino == 1396301 || mystat.st_ino == 1319264 || mystat.st_ino == 5768513 || mystat.st_ino == 1318781){
-				printf("WAIT STOP!\n");
+				printf("WAIT STOP!\n");timestamp();
 				printf("inode = %d \n", mystat.st_ino);
 				
 			}
@@ -149,11 +183,13 @@ void handle_event_exit_read(void *ctx, void *data, unsigned int data_sz)
     	closedir(mydir);
 	}
 
-	printf("exit_read STOP%lu  %lu %d \n", m->pid, m->uid,  m->bytes_read);
+	printf("exit_read STOP%lu  %lu  %s\n", m->pid, m->uid,   m->command);
+	x += 1;
+	printf("X= %d\n", x);
 }
 
 
-void handle_event_exit_openat(void *ctx, int cpu, void *data, unsigned int data_sz)
+void handle_event_exit_openat(void *ctx, void *data, unsigned int data_sz)
 {
 	struct exit_openat_dat_t *m = data;
 
@@ -185,8 +221,8 @@ void handle_event_exit_openat(void *ctx, int cpu, void *data, unsigned int data_
 			sprintf(buf, "%s/%s", path_str, myfile->d_name);
 			stat(buf, &mystat);
 			// printf("%zu\n",mystat.st_size);
-			printf("%zu\n", mystat.st_ino);
-			printf(" %s\n", myfile->d_name);
+			// printf("%zu\n", mystat.st_ino);
+			// printf(" %s\n", myfile->d_name);
 			
 
 			if(mystat.st_ino == 1396301 || mystat.st_ino == 1319264 || mystat.st_ino == 5768513 || mystat.st_ino == 1318781){
@@ -215,10 +251,11 @@ int main()
     struct hello_bpf *skel;
 	// struct bpf_object_open_opts *o;
     int err;
-	struct perf_buffer *pb = NULL;
-	struct perf_buffer *pb_openat = NULL;
-	struct perf_buffer *pb_exit_openat = NULL;
-	struct perf_buffer *pb_exit_read = NULL;
+	struct ring_buffer *rb = NULL;
+	struct ring_buffer *rb_openat = NULL;
+	struct ring_buffer *rb_exit_openat = NULL;
+	struct ring_buffer *rb_exit_read = NULL;
+	struct ring_buffer *rb_close = NULL;
 
 	libbpf_set_print(libbpf_print_fn);
 
@@ -258,34 +295,42 @@ int main()
         return 1;
 	}
 
-	pb = perf_buffer__new(bpf_map__fd(skel->maps.output), 8, handle_event, lost_event, NULL, NULL);
-	if (!pb) {
+	rb = ring_buffer__new(bpf_map__fd(skel->maps.output), handle_event_read, NULL, NULL);
+	if (!rb) {
 		err = -1;
 		fprintf(stderr, "Failed to create ring buffer\n");
 		hello_bpf__destroy(skel);
         return 1;
 	}
 
-	pb_openat = perf_buffer__new(bpf_map__fd(skel->maps.output_openat), 8, handle_event_openat, lost_event, NULL, NULL);
-	if (!pb) {
+	rb_openat = ring_buffer__new(bpf_map__fd(skel->maps.output_openat), handle_event_openat, NULL, NULL);
+	if (!rb_openat) {
 		err = -1;
-		fprintf(stderr, "Failed to create ring buffer pb_read\n");
+		fprintf(stderr, "Failed to create ring buffer rb_read\n");
 		hello_bpf__destroy(skel);
         return 1;
 	}
 
-	pb_exit_openat = perf_buffer__new(bpf_map__fd(skel->maps.output_exit_openat), 8, handle_event_exit_openat, lost_event, NULL, NULL);
-	if (!pb) {
+	rb_exit_openat = ring_buffer__new(bpf_map__fd(skel->maps.output_exit_openat), handle_event_exit_openat, NULL, NULL);
+	if (!rb_exit_openat) {
 		err = -1;
-		fprintf(stderr, "Failed to create ring buffer pb_read\n");
+		fprintf(stderr, "Failed to create ring buffer rb_read\n");
 		hello_bpf__destroy(skel);
         return 1;
 	}
 
-	pb_exit_read = ring_buffer__new(bpf_map__fd(skel->maps.output_exit_read), handle_event_exit_read, NULL, NULL);
-	if (!pb) {
+	rb_exit_read = ring_buffer__new(bpf_map__fd(skel->maps.output_exit_read), handle_event_exit_read, NULL, NULL);
+	if (!rb_exit_read) {
 		err = -1;
-		fprintf(stderr, "Failed to create ring buffer pb_read\n");
+		fprintf(stderr, "Failed to create ring buffer rb_read\n");
+		hello_bpf__destroy(skel);
+        return 1;
+	}
+
+	rb_close = ring_buffer__new(bpf_map__fd(skel->maps.output_close), handle_event_close, NULL, NULL);
+	if (!rb_close) {
+		err = -1;
+		fprintf(stderr, "Failed to create ring buffer rb_read\n");
 		hello_bpf__destroy(skel);
         return 1;
 	}
@@ -293,49 +338,59 @@ int main()
 
 //this could probably be threaded....
 	while (true) {
-		err = perf_buffer__poll(pb, 100 /* timeout, ms */);
+		err = ring_buffer__poll(rb, 100 /* timeout, ms */);
 		// Ctrl-C gives -EINTR
 		if (err == -EINTR) {
 			err = 0;
 			break;
 		}
 		if (err < 0) {
-			printf("Error polling perf buffer: %d\n", err);
-			break;
+			printf("Error polling ring buffer: 123 %d\n", err);
+			// break;
 		}
-		err = perf_buffer__poll(pb_openat, 100 /* timeout, ms */);
+		// err = ring_buffer__poll(rb_openat, 100 /* timeout, ms */);
+		// // Ctrl-C gives -EINTR
+		// if (err == -EINTR) {
+		// 	err = 0;
+		// 	break;
+		// }
+		// if (err < 0) {
+		// 	printf("Error polling ring buffer:456 %d\n", err);
+		// 	break;
+		// }
+		err = ring_buffer__poll(rb_exit_openat, 100 /* timeout, ms */);
 		// Ctrl-C gives -EINTR
 		if (err == -EINTR) {
 			err = 0;
 			break;
 		}
 		if (err < 0) {
-			printf("Error polling perf buffer: %d\n", err);
+			printf("Error polling ring buffer:789 %d\n", err);
 			break;
 		}
-		err = perf_buffer__poll(pb_exit_openat, 100 /* timeout, ms */);
+		err = ring_buffer__poll(rb_exit_read, 100 /* timeout, ms */);
 		// Ctrl-C gives -EINTR
 		if (err == -EINTR) {
 			err = 0;
 			break;
 		}
 		if (err < 0) {
-			printf("Error polling perf buffer: %d\n", err);
+			printf("Error polling ring buffer:101112 %d\n", err);
 			break;
 		}
-		err = ring_buffer__poll(pb_exit_read, 100 /* timeout, ms */);
+		err = ring_buffer__poll(rb_close, 100 /* timeout, ms */);
 		// Ctrl-C gives -EINTR
 		if (err == -EINTR) {
 			err = 0;
 			break;
 		}
 		if (err < 0) {
-			printf("Error polling perf buffer: %d\n", err);
+			printf("Error polling ring buffer:131415 %d\n", err);
 			break;
 		}
 	}
 
-	perf_buffer__free(pb);
+	ring_buffer__free(rb);
 	hello_bpf__destroy(skel);
 	return -err;
 }
