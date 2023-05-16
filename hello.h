@@ -1,43 +1,13 @@
-struct data_t {
-   int pid;
-   int uid;
-   char command[16];
-   char message[12];
-   char path[16];
-   char path2[16];
-   unsigned int fd;
-};
-
-
-struct openat_dat_t {
-   int pid;
-   int uid;
-   int dirfd;
-   char filename[50];
-};
-
-struct exit_openat_dat_t {
+struct read_data_t {
    int pid;
    int uid;
    int fd;
-   char command[16];
+   uint64_t inode;
+   char command[30];
 };
 
 
-struct exit_read_dat_t {
-   int pid;
-   int uid;
-   long bytes_read;
-   char command[16];
-};
 
-struct close_dat_t {
-   int pid;
-   int uid;
-   int fd;
-   char filename[50];
-   char command[16];
-};
 
 struct msg_t {
    char message[12];
