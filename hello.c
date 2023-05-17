@@ -9,6 +9,11 @@
 #include <dirent.h> 
 #include <fcntl.h>
 #include <time.h>
+#include <stdint.h> 
+
+
+#define SEC_TO_NS(sec) ((sec)*1000000000)
+
 
 int x = 0;
 
@@ -49,9 +54,24 @@ int handle_event_read(void *ctx, void *data, size_t data_sz)
         fprintf(stderr, "\nError opened file\n");
         exit(1);
     }
+
+	uint64_t nanoseconds;
+    struct timespec ts;
+    int return_code = timespec_get(&ts, TIME_UTC);
+    if (return_code == 0)
+    {
+        printf("Failed to obtain timestamp.\n");
+        nanoseconds = UINT64_MAX; // use this to indicate error
+    }
+    else
+    {
+        // `ts` now contains your timestamp in seconds and nanoseconds! To 
+        // convert the whole struct to nanoseconds, do this:
+        nanoseconds = SEC_TO_NS((uint64_t)ts.tv_sec) + (uint64_t)ts.tv_nsec;
+    }
   
     // int chars_written = fprintf(outfile, "%d %d %d %lu %s\n", kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
-	int chars_written = fprintf(outfile, "{\"pid\":%d,\"uid\":%d,\"fd\":%d,\"inode\":%lu,\"command\":\"%s\"}\n", kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
+	int chars_written = fprintf(outfile, "{\"timestamp\":%llu,\"pid\":%d,\"uid\":%d,\"fd\":%d,\"inode\":%lu,\"command\":\"%s\"}\n", nanoseconds, kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
   
 
 

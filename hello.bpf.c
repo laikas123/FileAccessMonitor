@@ -28,10 +28,6 @@ struct {
 
 
 
-
-
-
-
 struct my_syscalls_enter_read {
 	unsigned long long unused;
 	long syscall_nr;
@@ -53,7 +49,6 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
     data.fd = ctx -> fd;
     bpf_get_current_comm(&data.command, sizeof(data.command));
 
-   
 
     //get the task struct for the process that enetered read
     struct task_struct *task = (void *)bpf_get_current_task();
@@ -69,12 +64,14 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
     //inode number for fd
     u64 ino;
 
+
     //print the fd and inode 
     bpf_probe_read(&file, sizeof(file), &fd[data.fd]);
     bpf_probe_read(&inode, sizeof(inode), &file->f_inode);
     bpf_probe_read(&ino, sizeof(ino), &inode->i_ino);
     bpf_printk("fd ++++++= %d", ctx->fd);
     bpf_printk("inode +++++= %lu ", ino);
+    
 
 
     //log the inode
