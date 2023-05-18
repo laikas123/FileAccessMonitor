@@ -157,3 +157,67 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
     return 0;
 }
 ```
+
+The first line uses a special macro to define where we want the system call to happen. In this case when entering the read() system call. The ctx argument is of type *"struct my_syscalls_enter_read"* which is a custom defined struct based on the arguments to the read system call. The only thing we actually need from this is the file descriptor so we can see which file the process is accessing. For more information on how this struct was defined see chapter 7 of [Liz Rice's book](https://isovalent.com/learning-ebpf/) on eBPF under the section "Tracepoints".
+
+The read_data_t is another custom defined struct. See read_mon.h for more info. Its design is completely arbitrary and is used to log the important information from the tracepoint execution, because eventually this information will make it's way back to userspace so we can actually analyze it.
+
+
+We log some data to the read_data_t struct like pid, uid, etc. But what we care about most is getting the inode of the file being read. The real meat of the code that does this is:
+
+```c
+    //get the task struct for the process that enetered read
+    struct task_struct *task = (void *)bpf_get_current_task();
+
+    //this is the files array, the fd is the index into this
+    //and let's you get the file struct for the fd
+    struct file **fdtable = BPF_CORE_READ(task, files, fdt, fd);
+
+    //file struct for fd
+    struct file* file;
+    //inode struct for fd
+    struct inode* inode;
+    //inode number for fd
+    u64 ino;
+
+
+    //print the fd and inode 
+    bpf_probe_read(&file, sizeof(file), &fdtable[data.fd]);
+    bpf_probe_read(&inode, sizeof(inode), &file->f_inode);
+    bpf_probe_read(&ino, sizeof(ino), &inode->i_ino);
+```
+
+Here we get the task struct appropriately named "task" above. We then trace this to the file descriptor table named "fdtable". You can see that this is of type struct file\*\*. In other words an array of struct file\* . Using the file descriptor that was passed to read(), stored in "data.fd" we index into the file descriptor table which reads the file struct into "file". We then access the inode field of the file struct and voila! We have the inode of the file being read! 
+
+I was super excited when I realized this works. These eBPF programs are all kernel safe and super lightweight so being able to get this far was really exciting.
+
+Note that the bpf_probe_read functions are the special "helper" functions required to read kernel structures in an eBPF program. For more info see [here](https://man7.org/linux/man-pages/man7/bpf-helpers.7.html).
+
+
+Now what about this line at the end?
+
+```c
+    //send data to buffer to be polled by userspace
+    bpf_ringbuf_output(&output_read, &data, sizeof(data), 0); 
+```
+
+Well as the comment suggests, this sends data to a buffer which can later be polled by a userspace program. More accurately this buffer is what's called an eBPF map. You can think of an eBPF map as a structure that helps share data between kernel space and user space. The specific map in this case is called "output_read" and is defined as follows:
+
+```c
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1024 * 1024 /* 256 KB */);
+} output_read SEC(".maps");
+```
+
+The type of the map is *BPF_MAP_TYPE_RINGBUF* which is why I referred to it as a buffer. For a full list of map types see [here](https://prototype-kernel.readthedocs.io/en/latest/bpf/ebpf_maps.html). Note that the eBPF documentation isn't 100% organized. This is because its development constantly evolves with the Linux kernel. For instance the article on maps I share doesn't even mention the ringbuf type. Ringbuf types are relatively new at the time of this writing. A great article on them and why they were created can be found [here](https://nakryiko.com/posts/bpf-ringbuf/) (in general Andrii Nakryiko has super helpful stuff).
+
+
+Ok but back to the project!
+
+## Getting Data in Userspace
+
+
+After diving into the guts of the kernel it's time to reap the rewards by writing some much easier userspace code! This code isn't very exciting but is very rewarding. What it will do 
+
+

@@ -55,7 +55,7 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
 
     //this is the files array, the fd is the index into this
     //and let's you get the file struct for the fd
-    struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
+    struct file **fdtable = BPF_CORE_READ(task, files, fdt, fd);
 
     //file struct for fd
     struct file* file;
@@ -66,7 +66,7 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
 
 
     //print the fd and inode 
-    bpf_probe_read(&file, sizeof(file), &fd[data.fd]);
+    bpf_probe_read(&file, sizeof(file), &fdtable[data.fd]);
     bpf_probe_read(&inode, sizeof(inode), &file->f_inode);
     bpf_probe_read(&ino, sizeof(ino), &inode->i_ino);
     bpf_printk("fd ++++++= %d", ctx->fd);
