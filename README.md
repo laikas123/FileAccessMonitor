@@ -110,10 +110,6 @@ Recall that the read() system call, **as well as** the eBPF program execute in k
 
 Accessing kernel data structures fields with eBPF isn't as straightforward as acessing a strucutre in userspace. You need to call a few other helper functions. The code of my tracepoint function in the file **read_mon.bpf.c** can be seen below:
 
-
-![plot](read_mon_tracepoint.png)
-
-
 ```c
 SEC("tp/syscalls/sys_enter_read")
 int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
