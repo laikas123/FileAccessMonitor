@@ -8,10 +8,10 @@ use std::fs::File;
 use std::io::BufRead;
 use plotters::prelude::*;
 use chrono::{Utc, TimeZone, DateTime};
-const DATA: [f64; 14] = [ 137.24, 136.37, 138.43, 137.41, 139.69, 140.41, 141.58, 139.55, 139.68, 139.10, 138.24, 135.67, 137.12, 138.12];
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
-
+use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 
 use std::collections::BTreeMap;
@@ -21,12 +21,15 @@ pub type GeneralError = Box<dyn Error + Send + Sync + 'static>;
 pub type GeneralResult<T> = Result<T, GeneralError>;
 
 
+const COLORS: [RGBColor; 7] =  [BLUE, GREEN, RED, YELLOW, CYAN, BLACK, WHITE];
 
-#[derive(Debug, Deserialize, Serialize)]
+
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct ReadSyscallData {
     timestamp: u128,
     pid: usize,
-    uid: usize,
+    uid: i32,
     fd: i16,
     inode: usize,
     command: String,
@@ -59,101 +62,113 @@ impl DateStruct {
 
 }
 
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
-
-fn is_prime(n: i32) -> bool {
-    for i in 2..n {
-        if n % i == 0 {
-            return false;
-        }
-    }
-    true
+fn num_to_color(num: &usize) -> &'static RGBColor {
+    &COLORS[*num]
 }
 
 fn main() {
-    let test_dat = ReadSyscallData{
-        timestamp: 1684288147432831622,
-        pid: 40317,
-        uid: 1000,
-        fd: 3,
-        inode: 1319061,
-        command: "cat".to_string(),
-    };
-
-    data_to_json_file(&test_dat);
-
-    let (timestamps, pids, uids, fds, inodes, commands) = json_file_to_data("/home/logan/read_access.log".to_string()).unwrap();
-
     
 
-    let bmap: Vec<(i32, i32)>  = json_file_to_data::<ReadSyscallData>("/home/logan/read_access.log".to_string()).unwrap();
+    // let data_vec: Vec<(i32, i32)>  = json_file_to_data::<ReadSyscallData>("/home/logan/read_access.log".to_string()).unwrap();
 
 
-    println!("{:?}", bmap);
+    // let min_timestamp: i32 = data_vec[0].0;
+    // let max_timestamp: i32 = (*data_vec.iter().last().unwrap()).0;
 
-    let min_timestamp: i32 = bmap[0].0;
-    let max_timestamp: i32 = (*bmap.iter().last().unwrap()).0;
-
-    println!("min {:?}, max {:?}", min_timestamp, max_timestamp);
+    // println!("min {:?}, max {:?}", min_timestamp, max_timestamp);
 
 
     
-
-    let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    println!("{:?}", since_the_epoch);
-
    
+    let mut map_uid_to_map_hour_to_count = json_file_to_data_by_user::<ReadSyscallData>("/home/logan/read_access.log".to_string()).unwrap();
+
+    print_type_of(&GREEN);
     
-
-    let in_mc = since_the_epoch.as_micros();
-    let in_ms = since_the_epoch.as_nanos();
-
-    println!("{}, in_ms", in_ms);
-    println!("{}, in_ms", in_mc);
-
-
-    let mydatastruct = DateStruct{
-        year: 2023,
-        month: 05,
-        day: 17,
-        hour: 1,
-        min: 49,
-        sec: 14,
-        nano: 246414904,
-    };
-
-    data_to_json_file(&mydatastruct);
+    plot_data(map_uid_to_map_hour_to_count);
 
 
 
 
+    
+}
+
+
+fn plot_data(label_data_vec: BTreeMap<i32, BTreeMap<i32, i32>>) {
 
     let root_area = BitMapBackend::new("/home/logan/2.5.png", (600, 400))
     .into_drawing_area();
-  root_area.fill(&WHITE).unwrap();
+    root_area.fill(&WHITE).unwrap();
 
-  let mut ctx = ChartBuilder::on(&root_area)
+    let mut ctx = ChartBuilder::on(&root_area)
     .set_label_area_size(LabelAreaPosition::Left, 40)
     .set_label_area_size(LabelAreaPosition::Bottom, 40)
-    .caption("Line Plot Demo", ("sans-serif", 40))
+    .caption("Access to Files", ("sans-serif", 40))
     .build_cartesian_2d(0..18, 0..20)
     .unwrap();
 
-  ctx.configure_mesh()
-  .x_desc("Seconds")
-  .y_desc("% Busy")
-  .axis_desc_style(("sans-serif", 15)).draw().unwrap();
+    ctx.configure_mesh()
+    .x_desc("Hour of Day")
+    .y_desc("")
+    .axis_desc_style(("sans-serif", 15)).draw().unwrap();
 
-  ctx.draw_series(
-    LineSeries::new(bmap.iter().map(|x| (x.0, x.1)).inspect(|elem| println!("elem {:?}", elem)), &GREEN)
-  ).unwrap().label("Line").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &GREEN));
 
-  ctx.draw_series(
-        bmap.iter().map(|point| TriangleMarker::new(*point, 5, &BLUE)),
-    ).unwrap().label("Scatter").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &BLUE));
+    for i in 0..label_data_vec.len() {
+
+    }
+
+    
+    let mut color_index = 0;
+
+    for (uid, map_hour_count) in label_data_vec{
+        match color_index {
+            0 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[0])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[0]));
+            },
+            1 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[1])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[1]));
+            },
+            2 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[2])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[2]));
+            },
+            3 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[3])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[3]));
+            },
+            4 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[4])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[4]));
+            },
+            5 => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[5])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[5]));
+            },
+            _ => {
+                ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), &COLORS[6])
+            ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &COLORS[6]));
+            },
+        }
+        // ctx.draw_series(LineSeries::new(map_hour_count.iter().map(|x| (*x.0, *x.1)).inspect(|elem| println!("elem {:?}", elem)), color)
+        //     ).unwrap().label(uid.to_string()).legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], color));
+
+        color_index += 1;
+    }
+
+    // println!("color index is {}", color_index);
+
+    //   ctx.draw_series(
+    //     LineSeries::new(data_vec.iter().map(|x| (x.0, x.1)).inspect(|elem| println!("elem {:?}", elem)), &GREEN)
+    //   ).unwrap().label("Line").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &GREEN));
+
+    //   ctx.draw_series(
+    //         data_vec.iter().map(|point| TriangleMarker::new(*point, 5, &BLUE)),
+    //     ).unwrap().label("Scatter").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 5, y)], &BLUE));
 
     ctx.configure_series_labels()
         .border_style(&BLACK)
@@ -161,11 +176,6 @@ fn main() {
         .draw()
         .unwrap();
 
-}
-
-
-fn plot_data(data: Vec<(String, Vec<(i32, i32)>)) {
-
     
 
 }
@@ -173,39 +183,6 @@ fn plot_data(data: Vec<(String, Vec<(i32, i32)>)) {
 
 
 
-fn json_file_to_data(filename: String) -> GeneralResult<(Vec<u128>, Vec<usize>, Vec<usize>, Vec<i16>, Vec<usize>, Vec<String>)> {
-   
-
-    let file = File::open(filename).unwrap(); 
-    // Read the file line by line, and return an iterator of the lines of the file.
-    let lines = BufReader::new(file).lines(); 
-
-    let mut timestamps = Vec::new();
-    let mut pids = Vec::new();
-    let mut uids = Vec::new();
-    let mut fds = Vec::new();
-    let mut inodes = Vec::new();
-    let mut commands = Vec::new();
-    
-
-    for line in lines{
-        let parsed: ReadSyscallData = serde_json::from_str(&line.unwrap())?;
-
-        timestamps.push(parsed.timestamp);
-        pids.push(parsed.pid);
-        uids.push(parsed.uid);
-        fds.push(parsed.fd);
-        inodes.push(parsed.inode);
-        commands.push(parsed.command.clone());
-
-    }
-
-
-
-    Ok((timestamps, pids, uids, fds, inodes, commands))
-
-    
-}
 
 fn filter_time(timestamp: u128)  -> DateStruct{
     // Creates a new SystemTime from the specified number of whole seconds
@@ -227,10 +204,16 @@ fn filter_time(timestamp: u128)  -> DateStruct{
 }
 
 
-fn json_file_to_data<P>(filename: String) -> GeneralResult<Vec<(i32, i32)>> where P: DeserializeOwned +  std::fmt::Debug,{
+//returns a BTreeMap such that:
+//
+//Key = uid
+//
+//Value = vec of tuples where first element is the hour, 
+//second element is the number of reads to file
+fn json_file_to_data_by_user<P>(filename: String) -> GeneralResult<BTreeMap<i32, BTreeMap<i32, i32>>> where P: DeserializeOwned +  std::fmt::Debug,{
    
-    let mut result = BTreeMap::new();
-    let mut result2 = Vec::new();
+   
+    let mut map_uid_to_map_hour_to_count: BTreeMap<i32, BTreeMap<i32, i32>> = BTreeMap::new();
 
     let file = File::open(filename).unwrap(); 
     // Read the file line by line, and return an iterator of the lines of the file.
@@ -239,43 +222,62 @@ fn json_file_to_data<P>(filename: String) -> GeneralResult<Vec<(i32, i32)>> wher
     for line in lines{
         let parsed: ReadSyscallData = serde_json::from_str(&line.unwrap())?;
 
-        let datestruct = filter_time(parsed.timestamp);
+        let uid = parsed.uid;
+        let hour = filter_time(parsed.timestamp).hour;
 
+        println!("uid = {} hour = {} map_hour_to_count {:?}", uid, hour, map_uid_to_map_hour_to_count);
 
-        if let Some(hour) = result.get_mut(&datestruct.hour) {
-            *hour += 1;
+        if let Some(map_hour_to_count) = map_uid_to_map_hour_to_count.get_mut(&uid){
+            // println!("{:?}", *map_hour_to_count);
+            // *map_hour_to_count.get_mut(&hour).unwrap() += 1;
+            if let Some(count) = (*map_hour_to_count).get_mut(&hour) {
+                *count += 1;
+            }else{
+                (*map_hour_to_count).insert(hour, 1);
+            }
+
         }else{
-            result.insert(datestruct.hour, 1);
+            let mut new_hour_to_count = BTreeMap::new();
+            new_hour_to_count.insert(hour, 1);
+            map_uid_to_map_hour_to_count.insert(uid, new_hour_to_count);
         }
 
-
         
-
-
-        // println!("{:?}", parsed);
-        // results.push(parsed);
     }
 
-    for (key, val) in result {
-        result2.push((key, val));
+    for i in 0..24 {
+        for (uid, map_hour_count) in &mut map_uid_to_map_hour_to_count {
+            // println!("{}, {:?}", uid, map_hour_count);
+            if !map_hour_count.contains_key(&i){
+                map_hour_count.insert(i, 0);
+            }
+        }
     }
 
-    println!("result is {:?}", result2);
+    
+    // println!("{:?}", data_by_uid_vec);
 
-    Ok(result2)
+    for map in &map_uid_to_map_hour_to_count{
+        println!("{:?}", map);
+    }
+
+
+
+   
+
+    //need a datapoint for every hour of the day
+    // for i in 0..24 {
+    //     if let Some(count) = btreemap.get(&i) {
+    //         dat_vec.push((i, *count));
+    //     }else{
+    //         dat_vec.push((i, 0));
+    //     }
+    // }
+
+    
+
+    Ok(map_uid_to_map_hour_to_count)
 
     
 }
 
-
-fn data_to_json_file<P>(data: &P) -> GeneralResult<()> 
-    where P: Serialize
-{
-    // let mut f = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(DB_DIR.to_owned()+db_name+".db")?;
-    let json_string = serde_json::to_string(data)?;
-    println!("JSON DATA IS {:?}", json_string);
-    // f.write_all(json_string.as_bytes())?;
-    // f.flush()?;
-
-    Ok(())
-}
