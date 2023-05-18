@@ -1,7 +1,7 @@
 # Monitoring File Access with eBPF
 
 ## Visualizing File Reads
-
+<link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.css">
 When reading a file on your computer, the following diagram is roughly what happens:
 
 ```mermaid
