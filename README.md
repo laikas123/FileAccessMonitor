@@ -223,7 +223,7 @@ After diving into the guts of the kernel it's time to reap the rewards by writin
 This is done in read_mon.c. First the ringbuffer connection is initialized and then polled repeatedly:
 
 ```c
-//initialize ring buffer connection
+    //initialize ring buffer connection
 	rb_read = ring_buffer__new(bpf_map__fd(skel->maps.output_read), handle_event_read, NULL, NULL);
 	if (!rb_read) {
 		err = -1;
@@ -343,7 +343,7 @@ Marketing has been well instructed not to view this file. And given that they ar
 
 They wake up one morning and see the following:
 
-(Generated from actual file reads, see the \*_read.py files I have under the "pseduo_read" folder)
+(Generated from actual file reads, see the \*_read.py files I have under the "pseudo_read" folder)
 
 ![graph from use case](monitor_graph.png)
 
