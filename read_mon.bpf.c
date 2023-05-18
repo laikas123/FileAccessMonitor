@@ -39,9 +39,9 @@ struct my_syscalls_enter_read {
 
 SEC("tp/syscalls/sys_enter_read")
 int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
-   struct read_data_t data = {}; 
-
-
+    
+    //struct to hold logged data
+    struct read_data_t data = {}; 
 
     //log the pid, uid, fd, and the command
     data.pid = bpf_get_current_pid_tgid() >> 32;
@@ -52,7 +52,7 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
 
     //get the task struct for the process that enetered read
     struct task_struct *task = (void *)bpf_get_current_task();
-    
+
     //this is the files array, the fd is the index into this
     //and let's you get the file struct for the fd
     struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
@@ -71,17 +71,16 @@ int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
     bpf_probe_read(&ino, sizeof(ino), &inode->i_ino);
     bpf_printk("fd ++++++= %d", ctx->fd);
     bpf_printk("inode +++++= %lu ", ino);
-    
 
 
     //log the inode
     data.inode = ino;
         
 
-    //send data to userspace
-   bpf_ringbuf_output(&output_read, &data, sizeof(data), 0);   
-   
-   return 0;
+    //send data to buffer to be polled by userspace
+    bpf_ringbuf_output(&output_read, &data, sizeof(data), 0);   
+
+    return 0;
 }
 
 
