@@ -112,3 +112,52 @@ Accessing kernel data structures fields with eBPF isn't as straightforward as ac
 
 
 ![plot](read_mon_tracepoint.png)
+
+
+```c
+SEC("tp/syscalls/sys_enter_read")
+int tp_sys_enter_read(struct my_syscalls_enter_read *ctx) {
+    
+    //struct to hold logged data
+    struct read_data_t data = {}; 
+
+    //log the pid, uid, fd, and the command
+    data.pid = bpf_get_current_pid_tgid() >> 32;
+    data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    data.fd = ctx -> fd;
+    bpf_get_current_comm(&data.command, sizeof(data.command));
+
+
+    //get the task struct for the process that enetered read
+    struct task_struct *task = (void *)bpf_get_current_task();
+
+    //this is the files array, the fd is the index into this
+    //and let's you get the file struct for the fd
+    struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
+
+    //file struct for fd
+    struct file* file;
+    //inode struct for fd
+    struct inode* inode;
+    //inode number for fd
+    u64 ino;
+
+
+    //print the fd and inode 
+    bpf_probe_read(&file, sizeof(file), &fd[data.fd]);
+    bpf_probe_read(&inode, sizeof(inode), &file->f_inode);
+    bpf_probe_read(&ino, sizeof(ino), &inode->i_ino);
+    bpf_printk("fd ++++++= %d", ctx->fd);
+    bpf_printk("inode +++++= %lu ", ino);
+
+
+    //log the inode
+    data.inode = ino;
+        
+
+    //send data to buffer to be polled by userspace
+    bpf_ringbuf_output(&output_read, &data, sizeof(data), 0);   
+
+    return 0;
+}
+```
