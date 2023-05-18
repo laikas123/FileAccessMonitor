@@ -1,7 +1,7 @@
 # Monitoring File Access with eBPF
 
 ## Visualizing File Reads
-<link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.css">
+
 When reading a file on your computer, the following diagram is roughly what happens:
 
 ```mermaid
@@ -327,13 +327,34 @@ Now what good would this tool be if I couldn't list at least one case where it m
 
 ```mermaid
 flowchart TD
-    serv{File Server} -->|files| act[fa:fa-money-bill Accounting]
+    serv{File Server} -->|files| act[Accounting]
     act --> |ssh + give\nme files| serv
     mark --> |ssh + give\nme files| serv
     dev --> |ssh + give\nme files| serv
-    serv -->|files| mark[fa:fa-lightbulb Marketing]
-    serv -->|files| dev[fa:fa-cloud Developers]
+    serv -->|files| mark[Marketing]
+    serv -->|files| dev[Developers]
 ```
+
+Now luckily their file server is running Ubuntu 22.04 kernel version 5.19 ;) So they go ahead and add my code for monitoring file reads since it's been well tested in this environment.
+
+The accounting department and developers both deal with sensitive data. Accounting deals with financial data and updating credits cards. The developers deal with password hashes, and user access tokens. The company wanted to minimize the number of files with sensitive data so both accounting and the developers store/read their data with a file called "superdupersecret.txt".
+
+Marketing has been well instructed not to view this file. And given that they are trustworthy there has beeen no cause for concern. But just for extra measure they add the inode of "superdupersecret.txt" to the monitoring software and check the log files daily.
+
+They wake up one morning and see the following:
+
+(Generated from actual file reads, see the \*_read.py files I have under the "pseduo_read" folder)
+
+![alt text](./monitor_graph.png)
+
+You can see the the accounting department and the developers are accessing the files like they normally would. But also... The marketing department has an extremely high peak around 8AM. This would be a massive red flag for an intrusion detection system that understands the companies policies. In a real world situation you would want an intrustion detection system that completely blocks the ip address of marketing computers from being able to access the file server at all as they have likely been compromised.
+
+While this example is obviously generated it is not far off from what you might imagine happening in the real world. For example if you were to put the monitor to instead watch for reads to /etc/passwd and then you notice the user "apache" is making 1000s of reads at 4AM you would likely want to shutdown the system...
+
+
+## Wrapping Up: Running the Code and Some Final Words
+
+
 
 
 
