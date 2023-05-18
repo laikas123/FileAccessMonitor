@@ -427,7 +427,7 @@ CONTAINER ID   IMAGE                COMMAND                  CREATED         STA
 6d306eb17519   ebpfbox:Dockerfile   "/bin/bash"              5 seconds ago   Up 4 seconds                                                    kind_bouman
 ```
 
-The formatting is a bit messy in the README file, but basically in the row where IMAGE column says "ebpfbox:Dockerfile" you'll want to grab the data from the CONTAINER ID column. In my case the container id is 6d306eb17519. With this id in hand run the following to get a root shell into the same container running in the other terminal:
+The formatting is a bit messy in the README file, but basically in the row where the IMAGE column says "ebpfbox:Dockerfile" you'll want to grab the data from the CONTAINER ID column. In my case the container id is 6d306eb17519. With this id in hand run the following to get a root shell into the same container running in the other terminal:
 
 ```console
 logan@logan-ThinkPad-X1-Extreme-2nd:~$ docker exec -ti --privileged 6d306eb17519 /bin/bash
@@ -535,7 +535,7 @@ If you want to simulate some reads to a file with some slight randomness check o
 
 Some final things I would like to mention about this project and eBPF in general. 
 
-If all of the code doesn't make sense that is totally ok. I couldn't have created this project without the help of others. For instance, the make file is purely from Liz Rice's repo in the [chapter7 folder](https://github.com/lizrice/learning-ebpf/blob/main/chapter7/Makefile) with only some slight modificaitons. Additionally you will notice in the file hello.c, there are references to a "read_mon.skel.h" file. But you will notice my repo doesn't have this file...
+If all of the code doesn't make sense that is totally ok. I couldn't have created this project without the help of others. For instance, the make file is purely from Liz Rice's repo in the [chapter7 folder](https://github.com/lizrice/learning-ebpf/blob/main/chapter7/Makefile) with only some slight modificaitons. Additionally you will notice in the file read_mon.c, there are references to a "read_mon.skel.h" file. But you will notice my repo doesn't have this file...
 
 This is generated when you run the Makefile. And the code in hello.c that utilizes this skel header file is boiler plate code. The topic is beyond the scope of this read me, but again [Liz Rice's book] is excellent and makes stuff super clear as well as providing a ton of references for further reading.
 
