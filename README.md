@@ -27,7 +27,7 @@ flowchart TD
 ```
 
 
-Obviously there are more steps than this such as first using the open system call to get a file descriptor, checking the cache for the file before checking disk, etc.
+Obviously there are more steps than this such as first using the open() system call to get a file descriptor, checking the cache for the file before checking disk, etc.
 
 But for all practical purposes the above model will do. In writing the process is:
 
@@ -84,7 +84,7 @@ While that is true we need to remember how file descriptors get converted to fil
 The main kernel structures of importance are the following:
 
 1) Task Struct
-2) Files Decriptor Table
+2) File Decriptor Table
 3) File Struct
 
 Recall that on disk, every file has an unique inode. And unless some very specific scenarios happen this inode will be permanent to the file. Omitting just a few steps along the way, getting an inode looks roughly like the following:
@@ -422,9 +422,9 @@ docker ps
 You should see some ouptut similar to the following:
 
 ```console
-docker ps
-CONTAINER ID   IMAGE                   COMMAND                  CREATED          STATUS          PORTS                                       NAMES
-6d306eb17519   ebpfbox:Dockerfile                                              eager_buck
+logan@logan-ThinkPad-X1-Extreme-2nd:~$ docker ps
+CONTAINER ID   IMAGE                COMMAND                  CREATED         STATUS              PORTS                                       NAMES
+6d306eb17519   ebpfbox:Dockerfile   "/bin/bash"              5 seconds ago   Up 4 seconds                                                    kind_bouman
 ```
 
 The formatting is a bit messy in the README file, but basically in the row where IMAGE column says "ebpfbox:Dockerfile" you'll want to grab the data from the CONTAINER ID column. In my case the container id is 6d306eb17519. With this id in hand run the following to get a root shell into the same container running in the other terminal:
@@ -462,6 +462,7 @@ strace -q cat mysecretfile.txt
 read(3, "secret data here\n", 131072)
 read(3, "", 131072)
 ...
+```
 
 Note that 3 is the file descriptor used by cat to read "mysecretfile.txt" which we can verify by reading the now 4 lines from the access log:
 
