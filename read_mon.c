@@ -45,7 +45,7 @@ int handle_event_read(void *ctx, void *data, size_t data_sz)
 	FILE* outfile;
   
     // open log file for appending
-    outfile = fopen("/home/logan/read_access.log", "a+");
+    outfile = fopen("/read_access.log", "a+");
     if (outfile == NULL) {
         fprintf(stderr, "\nError opened file\n");
         exit(1);

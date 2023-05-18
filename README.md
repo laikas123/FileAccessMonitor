@@ -354,6 +354,40 @@ While this example is obviously generated it is not far off from what you might 
 
 ## Wrapping Up: Running the Code and Some Final Words
 
+If you want to run the code and play around with monitoring the reads to a file the easiest way is to use the Dockerfile in this respository.
+
+What you can do is clone the repo:
+
+```console
+git clone https://github.com/laikas123/FileAccessMonitor.git
+```
+
+Next cd into the repo and build the docker image:
+
+```console
+cd FileAccessMonitor/
+
+```
+
+
+
+
+
+
+
+Some final things I would like to mention about this project and eBPF in general. 
+
+If all of the code doesn't make sense that is totally ok. I couldn't have created this project without the help of others. For instance, the make file is purely from Liz Rice's repo in the [chapter7 folder](https://github.com/lizrice/learning-ebpf/blob/main/chapter7/Makefile) with only some slight modificaitons. Additionally you will notice in the file hello.c, there are references to a "read_mon.skel.h" file. But you will notice my repo doesn't have this file...
+
+This is generated when you run the Makefile. And the code in hello.c that utilizes this skel header file is boiler plate code. The topic is beyond the scope of this read me, but again [Liz Rice's book] is excellent and makes stuff super clear as well as providing a ton of references for further reading.
+
+
+All in all I just wanted to say if things with eBPF seem confusing at frist that is more than normal. It's a bit difficult to grasp at first, and it doesn't help that it's evolving constantly. 
+
+On the flip side however it is exciting because it's such a powerful tool, and even though it's constantly evolving the more you play around with it the easier it is. And it's awesome when you can build your own tracing tools!
+
+I hope this was helpful and happy coding :) 
+
 
 
 

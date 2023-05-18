@@ -60,6 +60,7 @@ impl DateStruct {
 fn uid_to_label(uid: i32) -> String {
 
     match uid {
+        0 => "uid:0 root".to_string(),
         490 => "uid:490 accounting".to_string(),
         590 => "uid:590 developers".to_string(),
         690 => "uid:690 marketing".to_string(),
@@ -73,7 +74,7 @@ fn uid_to_label(uid: i32) -> String {
 fn main() {
     
     //get data from log file into organize structure
-    let map_uid_to_map_hour_to_count = json_file_to_data_by_user::<ReadSyscallData>("/home/logan/read_access.log".to_string()).unwrap();
+    let map_uid_to_map_hour_to_count = json_file_to_data_by_user::<ReadSyscallData>("/read_access.log".to_string()).unwrap();
 
     //plot the data
     plot_data(map_uid_to_map_hour_to_count);
@@ -84,7 +85,7 @@ fn main() {
 
 fn plot_data(label_data_vec: BTreeMap<i32, BTreeMap<i32, i32>>) {
 
-    let root_area = BitMapBackend::new("/home/logan/2.5.png", (600, 400))
+    let root_area = BitMapBackend::new("/read_mon.png", (600, 400))
     .into_drawing_area();
     root_area.fill(&WHITE).unwrap();
 
