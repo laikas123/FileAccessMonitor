@@ -51,7 +51,7 @@ flowchart TD
     disk[(Files on \nDisk)]
     syscall("execute\nread(fd)")
     ebpf(ebpf \ntracepoint)-->disk
-    ebpf-->syscall
+    ebpf---syscall
     users -->|"cat secret.txt"| os
     os -->|"{data}"| users
     disk --> |"{data}"|os
@@ -63,6 +63,7 @@ flowchart TD
     ks(Kernel Space)-----hw(Hardware)
     linkStyle 7 stroke:#fff,stroke-width:4px,color:red;
     linkStyle 8 stroke:#fff,stroke-width:4px,color:red;
+    linkStyle 1 stroke:#fff,stroke-width:4px,color:red;
     style us fill:#fff,stroke:#fff,stroke-width:2px,color:#00FF00,stroke-dasharray: 5 5    
     style ks fill:#fff,stroke:#fff,stroke-width:2px,color:#0000FF,stroke-dasharray: 5 5    
     style hw fill:#fff,stroke:#fff,stroke-width:2px,color:#FF0000,stroke-dasharray: 5 5    
