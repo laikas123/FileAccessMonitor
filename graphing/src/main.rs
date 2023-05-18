@@ -107,7 +107,7 @@ fn plot_data(label_data_vec: BTreeMap<i32, BTreeMap<i32, i32>>) {
     .set_label_area_size(LabelAreaPosition::Left, 40)
     .set_label_area_size(LabelAreaPosition::Bottom, 40)
     .caption("Access to Files", ("sans-serif", 40))
-    .build_cartesian_2d(0..18, 0..20)
+    .build_cartesian_2d(0..18, 0..55)
     .unwrap();
 
     ctx.configure_mesh()

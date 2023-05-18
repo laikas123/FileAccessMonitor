@@ -218,6 +218,122 @@ Ok but back to the project!
 ## Getting Data in Userspace
 
 
-After diving into the guts of the kernel it's time to reap the rewards by writing some much easier userspace code! This code isn't very exciting but is very rewarding. What it will do 
+After diving into the guts of the kernel it's time to reap the rewards by writing some much easier userspace code! This code isn't very exciting but is very rewarding. What it will do is poll the buffer (our eBPF map) to check when there's fresh data from the kernel side eBPF program. It does this on a loop, and then acts on that data. 
+
+This is done in read_mon.c. First the ringbuffer connection is initialized and then polled repeatedly:
+
+```c
+//initialize ring buffer connection
+	rb_read = ring_buffer__new(bpf_map__fd(skel->maps.output_read), handle_event_read, NULL, NULL);
+	if (!rb_read) {
+		err = -1;
+		fprintf(stderr, "Failed to create ring buffer\n");
+		read_mon_bpf__destroy(skel);
+        return 1;
+	}
+
+	//poll the ring buffer repeatedly
+	while (true) {
+		err = ring_buffer__poll(rb_read, 100 /* timeout, ms */);
+		// Ctrl-C gives -EINTR
+		if (err == -EINTR) {
+			err = 0;
+			break;
+		}
+		
+	}
+```
+
+
+In the call to ring_buffer__new the argument "handle_event_read" is a callback function that gets called whenever we poll the buffer and it has data to give us. It is the most interesting part of this file and it is seen below:
+
+```c
+int handle_event_read(void *ctx, void *data, size_t data_sz)
+{
+	//convert data from buffer to struct
+	struct read_data_t *kern_dat = data;
+
+	//only log for specific list of files to monitor
+	if(kern_dat-> inode != 1396301 && kern_dat -> inode != 1318781){
+		return 0;
+	}
+
+	FILE* outfile;
+  
+    // open log file for appending
+    outfile = fopen("/home/logan/read_access.log", "a+");
+    if (outfile == NULL) {
+        fprintf(stderr, "\nError opened file\n");
+        exit(1);
+    }
+
+	uint64_t nanoseconds;
+    struct timespec ts;
+    int return_code = timespec_get(&ts, TIME_UTC);
+    if (return_code == 0)
+    {
+        printf("Failed to obtain timestamp.\n");
+        nanoseconds = UINT64_MAX; // use this to indicate error
+    }
+    else
+    {
+        //get the timestamp in nano seconds
+        nanoseconds = SEC_TO_NS((uint64_t)ts.tv_sec) + (uint64_t)ts.tv_nsec;
+    }
+	
+	//append data to file in json format
+	int chars_written = fprintf(outfile, "{\"timestamp\":%llu,\"pid\":%d,\"uid\":%d,\"fd\":%d,\"inode\":%lu,\"command\":\"%s\"}\n", nanoseconds, kern_dat->pid, kern_dat -> uid, kern_dat -> fd, kern_dat -> inode, kern_dat -> command);
+  
+
+	if(chars_written < 0){
+		printf("Error writing to file, err = %d", chars_written);
+	}else{
+		printf("Wrote %d chars to file", chars_written);
+	}
+
+    // close file
+    fclose(outfile);
+
+	return 0;
+	
+}
+
+```
+
+Right away notice we are using the same "read_data_t" struct. As I mentioned earlier we are passing data from kernel space to user space. So it makes sense the same struct would be used on the sending and receiving ends. 
+
+Once the buffer data is casted to the struct we have access to the inode that was registered from the read call. We check if it is one of the inodes to monitor. For now these are just hard coded. In a future update this will be read from a file.
+
+Note to get the inode for a file you can run "ls -i | grep {filename}" in a directory, for example this is the output I get when checking for a file called "superdupersecret.txt":
+
+```console
+logan@logan-ThinkPad-X1-Extreme-2nd:~$ ls -i | grep "superdupersecret.txt"
+1396301 superdupersecret.txt
+```
+
+And you can see in the code this is one of the inode numbers I am checking for.
+
+Assuming the read() system call was called on an inode of interest, we open our log file for appending, get a timestamp in nanoseconds, and then write the data to the log file in json format.
+
+
+Easy as that :)
+
+I have an additional folder in this repo called "graphing", which takes the log file and outputs some nice graphs for us to analyze the data in a more readable format. I am not going to cover this code since it's mainly just data parsing. However if you are into Rust (I'm a pretty big fan so far) I recommend checking out two of the crates (Rust's version of libraries/packages) used in that code. The first is [serde](https://crates.io/crates/serde) which is used to serialize/deserialize json (e.g. how we read the log file into a Rust struct). And the second which I just recently discovered is [plotters](https://crates.io/crates/plotters). This crate is super cool! If you are coming from matplotlib it's not that hard to get started with plotters and I highly recommend.
+
+
+## Visualizing the Data and Sample Use Case
+
+Now what good would this tool be if I couldn't list at least one case where it might be helpful. Let's consider the following setup. We have a small company with 3 departments: accounting, marketing, and developers. Since they are just a startup company money is tight and so all of their files are managed on a central computer in the office. They ssh into this machine when they need to access files. The setup looks as follows:
+
+```mermaid
+flowchart TD
+    serv{File Server} -->|files| act[fa:fa-money-bill Accounting]
+    act --> |ssh + give\nme files| serv
+    mark --> |ssh + give\nme files| serv
+    dev --> |ssh + give\nme files| serv
+    serv -->|files| mark[fa:fa-lightbulb Marketing]
+    serv -->|files| dev[fa:fa-cloud Developers]
+```
+
 
 
