@@ -345,14 +345,14 @@ They wake up one morning and see the following:
 
 (Generated from actual file reads, see the \*_read.py files I have under the "pseduo_read" folder)
 
-![alt text](./monitor_graph.png)
+![graph from use case](monitor_graph.png)
 
 You can see the the accounting department and the developers are accessing the files like they normally would. But also... The marketing department has an extremely high peak around 8AM. This would be a massive red flag for an intrusion detection system that understands the companies policies. In a real world situation you would want an intrustion detection system that completely blocks the ip address of marketing computers from being able to access the file server at all as they have likely been compromised.
 
 While this example is obviously generated it is not far off from what you might imagine happening in the real world. For example if you were to put the monitor to instead watch for reads to /etc/passwd and then you notice the user "apache" is making 1000s of reads at 4AM you would likely want to shutdown the system...
 
 
-## Wrapping Up: Running the Code and Some Final Words
+## Running the Code 
 
 If you want to run the code and play around with monitoring the reads to a file the easiest way is to use the Dockerfile in this respository.
 
@@ -366,13 +366,170 @@ Next cd into the repo and build the docker image:
 
 ```console
 cd FileAccessMonitor/
-
+docker build --no-cache -t "ebpfbox:Dockerfile" .
 ```
 
+This will take a few minutes to run, but after it finishes you can get a root shell into the container by running this command:
+
+```console
+docker run -ti --privileged ebpfbox:Dockerfile /bin/bash
+```
+
+Once inside the root shell we need to mount the kernel debug file system to that we can use tracepoints:
+
+```console
+mount -t debugfs none /sys/kernel/debug
+```
+
+Ok one last setup thing then we can get to some fun stuff.
+
+Since the program works on inodes we need to get an inode for a file we want to monitor.
+
+You do something like the following:
+
+```console
+root@6d306eb17519:/# echo "secret data here" > mysecretfile.txt
+root@6d306eb17519:/# ls -i | grep "mysecretfile.txt"
+947280 mysecretfile.txt
+```
+Note your inode number might be different. 
+
+Next in read_mon.c update the following line to contain your inode:
+
+```c
+        //only log for specific list of files to monitor
+        if(kern_dat-> inode != 947280){
+                return 0;
+        }
+```
+
+Where you would replace 947280 with your inode number.
+
+Great! So now we can run our tracepoint program. To do so change into the repo, run make, then run the executable:
+
+```console
+cd FileAccessMonitor
+make
+./read_mon
+```
+
+We will leave this running. Next open a new terminal on your computer and enter the following command:
+
+```console
+docker ps
+```
+
+You should see some ouptut similar to the following:
+
+```console
+docker ps
+CONTAINER ID   IMAGE                   COMMAND                  CREATED          STATUS          PORTS                                       NAMES
+6d306eb17519   ebpfbox:Dockerfile                                              eager_buck
+```
+
+The formatting is a bit messy in the README file, but basically in the row where IMAGE column says "ebpfbox:Dockerfile" you'll want to grab the data from the CONTAINER ID column. In my case the container id is 6d306eb17519. With this id in hand run the following to get a root shell into the same container running in the other terminal:
+
+```console
+logan@logan-ThinkPad-X1-Extreme-2nd:~$ docker exec -ti --privileged 6d306eb17519 /bin/bash
+root@6d306eb17519:/#
+```
+
+Great, now let's read from the file "mysecretfile.txt".
+
+```console
+root@6d306eb17519:/# cat mysecretfile.txt 
+secret data here
+```
+
+The program will have created an access log that we can view by running:
+
+```console
+root@6d306eb17519:/# cat read_access.log 
+{"timestamp":1684428373602394137,"pid":81664,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+{"timestamp":1684428373602484617,"pid":81664,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+```
+
+We officially logged data from the read() system call!
+
+Noe there are two lines of output because cat uses the read system call twice.
+
+This can be verified by installing and running strace:
+
+```console
+apt get install strace
+strace -q cat mysecretfile.txt
+...
+read(3, "secret data here\n", 131072)
+read(3, "", 131072)
+...
+
+Note that 3 is the file descriptor used by cat to read "mysecretfile.txt" which we can verify by reading the now 4 lines from the access log:
+
+```console
+root@6d306eb17519:/# cat read_access.log 
+{"timestamp":1684428373602394137,"pid":81664,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+{"timestamp":1684428373602484617,"pid":81664,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+{"timestamp":1684428553094139244,"pid":82415,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+{"timestamp":1684428553094667248,"pid":82415,"uid":0,"fd":3,"inode":947280,"command":"cat"}
+```
+
+Note that fd is 3 for every entry. And we called cat twice so a total of 4 entries.
 
 
+Ok great so it's all working.
+
+To get the graph we will need to install cargo to run the rust program.
+
+To do so simply run this line (from the [Rust site](https://www.rust-lang.org/tools/install)) and press enter when prompted
+
+```console
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Then run the following to configure the current shell:
+
+```console
+source "$HOME/.cargo/env"
+```
+
+There is one more additional thing to install so that the plotters crate works. As mentioned on their [getting started page](https://plotters-rs.github.io/book/intro/getting_started.html) we need to run:
+
+```console
+apt-get install libfontconfig libfontconfig1-dev
+```
+
+Ok lastly all we need to do is cd into the Rust project and run it:
+
+```console
+cd FileAccessMonitor/graphing/
+cargo run
+```
+
+Cargo will install some dependencies. And after a few minutes it should complete without issues. 
+
+Note, there is no output because it's simply creating a .png file for the graph.
+
+To move this to your local machine run:
+
+(again use your container id instead of mine)
+
+```console
+docker cp 6d306eb17519:/read_mon.png ~/read_mon.png
+```
+
+If you followed this tutorial line for line you should see something similar to the following when viewing the image:
+
+(The hours will probably be different)
+
+![Tutorial Image](read_mon_tutorial.png)
 
 
+Awesome! You are officially up and running. If you want to run on a desktop instead you can pretty much just take the commands from the docker file and run them on your own computer.
+
+If you want to simulate some reads to a file with some slight randomness check out the pseudo_read folder. It's pretty basic, but easy to use. Note you will need to update the UIDs in the Rust file based on the users you use.
+
+
+## Wrapping Up: Some Final Thoughts
 
 
 Some final things I would like to mention about this project and eBPF in general. 
